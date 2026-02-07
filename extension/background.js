@@ -22,6 +22,23 @@ const PHISHING_WARN_THRESHOLD = 0.60;  // 60% confidence = WARN
 const urlCache = new Map();
 const pendingChecks = new Map(); // Prevent duplicate concurrent checks
 
+// Whitelist of trusted domains (skip phishing check for these)
+const TRUSTED_DOMAINS = new Set([
+  'google.com', 'youtube.com', 'gmail.com', 'google.co.in', 'google.co.uk',
+  'facebook.com', 'instagram.com', 'whatsapp.com',
+  'microsoft.com', 'live.com', 'outlook.com', 'office.com', 'bing.com',
+  'apple.com', 'icloud.com',
+  'amazon.com', 'amazon.in', 'amazon.co.uk',
+  'twitter.com', 'x.com',
+  'linkedin.com',
+  'github.com', 'stackoverflow.com',
+  'wikipedia.org', 'reddit.com',
+  'yahoo.com', 'netflix.com',
+  'paypal.com',
+  'ebay.com',
+  'adobe.com'
+]);
+
 const HEURISTIC_TLDS = new Set([
   'tk', 'ru', 'cn', 'info', 'shop', 'site', 'online', 'link', 'top', 'xyz', 'buzz', 'click',
   'help', 'support'
@@ -184,6 +201,32 @@ async function getPrediction(url) {
 }
 
 /**
+ * Check if a URL belongs to a trusted domain
+ * @param {string} url - URL to check
+ * @returns {boolean} - true if domain is trusted
+ */
+function isTrustedDomain(url) {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // Check exact match
+    if (TRUSTED_DOMAINS.has(hostname)) return true;
+    
+    // Check if it's a subdomain of a trusted domain
+    for (const trustedDomain of TRUSTED_DOMAINS) {
+      if (hostname === trustedDomain || hostname.endsWith('.' + trustedDomain)) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * ⚡ AUTOMATIC URL INTERCEPTION - webNavigation API
  * 
  * This listener fires BEFORE any page loads, allowing us to:
@@ -202,6 +245,12 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (!url.startsWith('http://') && !url.startsWith('https://')) return;
   if (url.includes('chrome-extension://')) return;
   if (url.includes('localhost:5000')) return; // Skip Flask backend
+  
+  // Skip trusted domains (Google, Facebook, Microsoft, etc.)
+  if (isTrustedDomain(url)) {
+    log('TRUSTED', `✅ Trusted domain, skipping check: ${url}`);
+    return;
+  }
   
   log('INTERCEPT', `🔍 Checking navigation to: ${url}`);
 
