@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "🔒 Phishing Link Detector",
+  "version": "1.0.0",
+  "description": "Analyzes links on web pages and warns you about potential phishing attempts in real-time",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "webRequest",
+    "webNavigation",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Phishing Link Detector"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["warning.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
