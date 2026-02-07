@@ -274,8 +274,56 @@ function showWarningModal(url, probability) {
   modal.querySelector('.phishing-btn-yes').addEventListener('click', () => {
     modal.remove();
     currentModalShown = false;
-    window.location.href = pendingUrl;
+    
+    const targetUrl = pendingUrl;
+    pendingUrl = null;
+    
+    console.log('[Phishing Detector] User chose to open anyway:', targetUrl);
+    
+    // Tell background.js to temporarily allow this URL
+    if (chrome?.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({
+        action: 'allowUrl',
+        url: targetUrl
+      }, (response) => {
+        // After allowlist is updated, navigate
+        navigateToUrl(targetUrl);
+      });
+    } else {
+      // No extension API available, just navigate
+      navigateToUrl(targetUrl);
+    }
   });
+  
+  function navigateToUrl(url) {
+    // Try multiple navigation methods for better compatibility
+    try {
+      window.location.href = url;
+    } catch (e) {
+      console.error('[Phishing Detector] Direct navigation failed:', e);
+      
+      // Method 2: Create and click a temporary link
+      try {
+        const tempLink = document.createElement('a');
+        tempLink.href = url;
+        tempLink.target = '_self';
+        tempLink.style.display = 'none';
+        document.body.appendChild(tempLink);
+        tempLink.click();
+        document.body.removeChild(tempLink);
+      } catch (e2) {
+        console.error('[Phishing Detector] Link click failed:', e2);
+        
+        // Method 3: Force navigation via window.open
+        try {
+          window.open(url, '_self');
+        } catch (e3) {
+          console.error('[Phishing Detector] All navigation methods failed:', e3);
+          alert('Unable to navigate. Please copy the URL and paste it in a new tab.');
+        }
+      }
+    }
+  }
   
   document.addEventListener('keydown', function escapeClose(e) {
     if (e.key === 'Escape') {

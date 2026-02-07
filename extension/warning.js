@@ -60,13 +60,29 @@ if (proceedBtn) {
       // Log the navigation
       console.log('User chose to proceed to:', actualUrl);
       
-      // Navigate to the URL
-      try {
-        window.location.href = actualUrl;
-      } catch (error) {
-        console.error('Navigation failed:', error);
-        // Fallback: try opening in new tab
-        window.open(actualUrl, '_self');
+      // Tell background.js to temporarily allow this URL
+      if (chrome?.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          action: 'allowUrl',
+          url: actualUrl
+        }, (response) => {
+          // After allowlist is updated, navigate
+          try {
+            window.location.href = actualUrl;
+          } catch (error) {
+            console.error('Navigation failed:', error);
+            // Fallback: try opening in new tab
+            window.open(actualUrl, '_self');
+          }
+        });
+      } else {
+        // No extension API available, just navigate
+        try {
+          window.location.href = actualUrl;
+        } catch (error) {
+          console.error('Navigation failed:', error);
+          window.open(actualUrl, '_self');
+        }
       }
     }
   });

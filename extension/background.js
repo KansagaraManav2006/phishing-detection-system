@@ -21,6 +21,7 @@ const PHISHING_BLOCK_THRESHOLD = 0.80; // 80% confidence = BLOCK
 const PHISHING_WARN_THRESHOLD = 0.60;  // 60% confidence = WARN
 const urlCache = new Map();
 const pendingChecks = new Map(); // Prevent duplicate concurrent checks
+const temporaryAllowlist = new Map(); // URLs temporarily allowed by user
 
 // Whitelist of trusted domains (skip phishing check for these)
 const TRUSTED_DOMAINS = new Set([
@@ -252,6 +253,22 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     return;
   }
   
+  // Check if user clicked "Open Anyway" recently for this URL
+  const allowKey = url.toLowerCase();
+  if (temporaryAllowlist.has(allowKey)) {
+    const allowTime = temporaryAllowlist.get(allowKey);
+    const ageMs = Date.now() - allowTime;
+    
+    // Allow for 30 seconds after user clicks "Open Anyway"
+    if (ageMs < 30000) {
+      log('ALLOWED', `✅ User chose to proceed: ${url}`);
+      return;
+    } else {
+      // Expired, remove from allowlist
+      temporaryAllowlist.delete(allowKey);
+    }
+  }
+  
   log('INTERCEPT', `🔍 Checking navigation to: ${url}`);
 
   // Heuristic short-circuit so warning shows BEFORE navigation
@@ -354,6 +371,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     // Return true to indicate we'll send response asynchronously
     return true;
+    
+  } else if (request.action === 'allowUrl') {
+    // User clicked "Open Anyway" - temporarily allow this URL
+    const url = request.url;
+    if (url) {
+      temporaryAllowlist.set(url.toLowerCase(), Date.now());
+      log('ALLOWLIST', `✅ Temporarily allowing: ${url}`);
+      sendResponse({ success: true });
+    }
+    return true;
+    
   } else if (request.action === 'log') {
     // For debugging from content scripts
     log('PAGE', request.message);
